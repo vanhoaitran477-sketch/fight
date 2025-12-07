@@ -1,0 +1,7 @@
+{
+  "name": "Duel AI: Motion Combat",
+  "description": "A 2-player webcam fighting game using MediaPipe for body tracking and p5.js for visuals. Players fight by punching and block by crossing arms.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
