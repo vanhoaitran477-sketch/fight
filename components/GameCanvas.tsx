@@ -401,7 +401,19 @@ export const GameCanvas: React.FC = () => {
             const vy = hand.wrist.y - hand.prev.y;
             const velocity = Math.sqrt(vx*vx + vy*vy);
             const armAngle = calculateAngle(hand.shoulder, hand.elbow, hand.wrist);
-            const isForwardDir = playerData.id === 1 ? vx < -0.01 : vx > 0.01;
+            
+            // Check direction: P1 needs negative vx (towards right side of screen/opponent), P2 needs positive vx
+            const isForwardDir = playerData.id === 1 
+                ? vx < -GAME_CONSTANTS.PUNCH_DIRECTION_THRESHOLD 
+                : vx > GAME_CONSTANTS.PUNCH_DIRECTION_THRESHOLD;
+
+            // Check if wrist is extended outward relative to elbow (to confirm it's a thrust, not just a swing)
+            const isExtendedOutward = playerData.id === 1 
+                ? hand.wrist.x < hand.elbow.x 
+                : hand.wrist.x > hand.elbow.x;
+
+            // Check if wrist is sufficiently far from shoulder horizontally (Reach check)
+            const isReachValid = Math.abs(hand.wrist.x - hand.shoulder.x) > GAME_CONSTANTS.PUNCH_REACH_THRESHOLD;
 
             hand.prev.x = hand.wrist.x;
             hand.prev.y = hand.wrist.y;
@@ -409,7 +421,9 @@ export const GameCanvas: React.FC = () => {
             if (!didPunch && playerData.punchCooldown === 0) {
                 if (velocity > GAME_CONSTANTS.PUNCH_VELOCITY_THRESHOLD && 
                     armAngle > GAME_CONSTANTS.ARM_EXTENSION_THRESHOLD && 
-                    isForwardDir) {
+                    isForwardDir &&
+                    isExtendedOutward &&
+                    isReachValid) {
                     didPunch = true;
                     punchHandPos = hand.wrist;
                 }

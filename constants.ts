@@ -21,7 +21,7 @@ export const GAME_CONSTANTS = {
   SWORD_SWING_THRESHOLD: 0.015, // Vertical velocity to trigger swing
   SWORD_COOLDOWN: 20, // Frames between swings
   
-  PUNCH_COOLDOWN: 15, // Reduced for alternating punches
+  PUNCH_COOLDOWN: 15, 
   PROJECTILE_SPEED: 15,
   PROJECTILE_SPEED_SPECIAL: 10, // Slower but bigger
   PROJECTILE_SPEED_SLASH: 25, // Fast slash wave
@@ -31,6 +31,9 @@ export const GAME_CONSTANTS = {
   // Distance from Wrist to Opposite Shoulder (Crossed Arms)
   BLOCK_SHOULDER_DIST: 0.25, 
   
-  PUNCH_VELOCITY_THRESHOLD: 0.025, // More sensitive for rapid movement
-  ARM_EXTENSION_THRESHOLD: 120, // More forgiving angle
+  // Punch Thresholds - Tightened for "back and forth" requirement
+  PUNCH_VELOCITY_THRESHOLD: 0.05, // Doubled: requires faster thrust
+  PUNCH_DIRECTION_THRESHOLD: 0.02, // Min X-velocity in direction of enemy
+  ARM_EXTENSION_THRESHOLD: 140, // Arm must be nearly straight (180 is straight)
+  PUNCH_REACH_THRESHOLD: 0.1, // Wrist must be at least this far from shoulder (x-axis)
 };
