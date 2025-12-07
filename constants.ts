@@ -1,16 +1,17 @@
+
 export const GAME_CONSTANTS = {
   MAX_HP: 100,
   DAMAGE_NORMAL: 2,
   DAMAGE_BLOCKED: 1, // Damage taken when blocking normal
-  DAMAGE_REFLECT: 1, // Damage reflected to attacker when blocking normal
+  DAMAGE_REFLECT: 0, // REMOVED: No damage reflected to attacker
   
   // Special Attack Constants
   DAMAGE_SPECIAL: 10,
   DAMAGE_SPECIAL_BLOCKED: 3,
   CHARGE_DURATION: 2500, // 2.5 seconds (Time based)
   CHARGE_HAND_Y_DIFF: 0.2, // Min vertical distance between hands to register 'one up one down'
-  CHARGE_HAND_X_DIFF: 0.2, // Max horizontal distance (hands shouldn't be too wide apart)
-  POSE_VERTICAL_THRESHOLD: 0.05, // Hands must be clearly above/below shoulders (More sensitive)
+  CHARGE_HAND_X_DIFF: 0.4, // Increased: Allow wider stance
+  POSE_VERTICAL_THRESHOLD: 0.02, // Decreased: Easier to trigger 'up/down' relative to shoulder
   
   // Sword Constants
   DAMAGE_SWORD: 3,

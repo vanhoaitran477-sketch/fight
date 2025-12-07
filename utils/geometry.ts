@@ -1,6 +1,11 @@
 import { Landmark } from '../types';
 
-export const calculateAngle = (a: Landmark, b: Landmark, c: Landmark): number => {
+interface Point {
+  x: number;
+  y: number;
+}
+
+export const calculateAngle = (a: Point, b: Point, c: Point): number => {
   const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
   let angle = Math.abs((radians * 180.0) / Math.PI);
   if (angle > 180.0) {
@@ -9,7 +14,7 @@ export const calculateAngle = (a: Landmark, b: Landmark, c: Landmark): number =>
   return angle;
 };
 
-export const dist = (a: Landmark, b: Landmark): number => {
+export const dist = (a: Point, b: Point): number => {
   return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 };
 

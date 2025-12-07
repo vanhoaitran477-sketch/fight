@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import p5 from 'p5';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
@@ -331,6 +332,8 @@ export const GameCanvas: React.FC = () => {
         // Only interrupt charge if gesture is invalid AND player is not currently being hit
         // (Super Armor during hit prevents charge loss)
         const shouldBreakCharge = !validGesture && !playerData.isHit; 
+        
+        // Must be in pose, within horizontal limits. REMOVED stability check.
         const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_HAND_X_DIFF;
 
         if (isChargeGesture || (playerData.charge.active && playerData.isHit)) {
@@ -473,8 +476,6 @@ export const GameCanvas: React.FC = () => {
                         updateReactState("FULL BLOCK!");
                     } else {
                         targetData.hp -= GAME_CONSTANTS.DAMAGE_BLOCKED;
-                        const attackerData = proj.ownerId === 1 ? p1Data : p2Data;
-                        attackerData.hp -= GAME_CONSTANTS.DAMAGE_REFLECT;
                         updateReactState("BLOCKED!");
                     }
                 } else {
