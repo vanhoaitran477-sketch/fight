@@ -14,6 +14,7 @@ export interface PlayerState {
     active: boolean;
     progress: number; // 0.0 to 1.0
     complete: boolean;
+    startTime: number;
   };
 }
 

@@ -31,7 +31,8 @@ const createPlayer = (id: 1 | 2): PlayerState => ({
   charge: {
     active: false,
     progress: 0,
-    complete: false
+    complete: false,
+    startTime: 0
   }
 });
 
@@ -267,14 +268,16 @@ export const GameCanvas: React.FC = () => {
         const isSwordStance = wristDist < GAME_CONSTANTS.SWORD_HAND_DIST;
 
         if (isSwordStance) {
-             // Anti-Cross Check:
-             // If Right Wrist is significantly to the right of Left Wrist (in image coords),
-             // it means the arms are crossed. 
-             // Normal stance: LeftWrist (15) > RightWrist (16) due to mirroring/facing.
-             // Crossed stance: LeftWrist < RightWrist.
-             // We allow a small overlap buffer (SWORD_CROSS_CHECK_X).
+             // Anti-Cross Check 1: X-Axis Overlap
+             // If Right Wrist is significantly to the right of Left Wrist, it's likely a cross.
              if (rightWrist.x - leftWrist.x > GAME_CONSTANTS.SWORD_CROSS_CHECK_X) {
-                 // This looks like a block attempt, skip sword.
+                 return;
+             }
+
+             // Anti-Cross Check 2: Shoulder Proximity Buffer (CRITICAL FIX)
+             // If either wrist is getting close to the opposite shoulder (preparing to block),
+             // disable sword generation. This buffer is larger than the block threshold.
+             if (distLtoR < GAME_CONSTANTS.SWORD_BLOCK_BUFFER || distRtoL < GAME_CONSTANTS.SWORD_BLOCK_BUFFER) {
                  return;
              }
 
@@ -314,30 +317,44 @@ export const GameCanvas: React.FC = () => {
         }
 
         // 3. SPECIAL ATTACK - CHARGE DETECTION
-        const yDiff = Math.abs(leftWrist.y - rightWrist.y);
+        // Calculate status relative to shoulders for "Up" and "Down"
+        const isLeftUp = leftWrist.y < leftShoulder.y - GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
+        const isLeftDown = leftWrist.y > leftShoulder.y + GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
+        const isRightUp = rightWrist.y < rightShoulder.y - GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
+        const isRightDown = rightWrist.y > rightShoulder.y + GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
+        
+        // Valid if (Left Up & Right Down) OR (Left Down & Right Up)
+        const validGesture = (isLeftUp && isRightDown) || (isLeftDown && isRightUp);
+        
         const xDiff = Math.abs(leftWrist.x - rightWrist.x);
         
-        const isChargeGesture = yDiff > GAME_CONSTANTS.CHARGE_HAND_Y_DIFF && xDiff < GAME_CONSTANTS.CHARGE_HAND_X_DIFF;
+        // Only interrupt charge if gesture is invalid AND player is not currently being hit
+        // (Super Armor during hit prevents charge loss)
+        const shouldBreakCharge = !validGesture && !playerData.isHit; 
+        const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_HAND_X_DIFF;
 
-        if (isChargeGesture) {
+        if (isChargeGesture || (playerData.charge.active && playerData.isHit)) {
+            const now = performance.now();
+            
             if (!playerData.charge.active) {
                 playerData.charge.active = true;
+                playerData.charge.startTime = now;
                 playerData.charge.progress = 0;
                 playerData.charge.complete = false;
             }
 
-            if (playerData.charge.progress < 1.0) {
-                playerData.charge.progress += (1.0 / GAME_CONSTANTS.CHARGE_FRAMES);
-                if (playerData.charge.progress >= 1.0) {
-                    playerData.charge.progress = 1.0;
-                    playerData.charge.complete = true;
-                }
+            // Time-based progress
+            const elapsed = now - playerData.charge.startTime;
+            playerData.charge.progress = Math.min(1.0, elapsed / GAME_CONSTANTS.CHARGE_DURATION);
+            
+            if (playerData.charge.progress >= 1.0) {
+                playerData.charge.complete = true;
             }
             
             prevWrists.left.x = leftWrist.x; prevWrists.left.y = leftWrist.y;
             prevWrists.right.x = rightWrist.x; prevWrists.right.y = rightWrist.y;
             return;
-        } else {
+        } else if (shouldBreakCharge) {
             if (playerData.charge.active) {
                 if (playerData.charge.complete) {
                     // FIRE SPECIAL!
@@ -520,11 +537,16 @@ export const GameCanvas: React.FC = () => {
             const rightWrist = landmarks[16];
             const leftElbow = landmarks[13];
             const rightElbow = landmarks[14];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
             
-            // Re-calc stance for drawing (including anti-cross check) to keep visuals in sync with logic
+            // Re-calc stance for drawing (including anti-cross checks) to keep visuals in sync with logic
             const wristDist = dist(leftWrist, rightWrist);
+            const distLtoR = dist(leftWrist, rightShoulder);
+            const distRtoL = dist(rightWrist, leftShoulder);
             const isSwordStance = wristDist < GAME_CONSTANTS.SWORD_HAND_DIST && 
-                                  !(rightWrist.x - leftWrist.x > GAME_CONSTANTS.SWORD_CROSS_CHECK_X);
+                                  !(rightWrist.x - leftWrist.x > GAME_CONSTANTS.SWORD_CROSS_CHECK_X) &&
+                                  !(distLtoR < GAME_CONSTANTS.SWORD_BLOCK_BUFFER || distRtoL < GAME_CONSTANTS.SWORD_BLOCK_BUFFER);
 
             if (isSwordStance && !data.isBlocking) {
                 // Calculate Sword Angle based on forearms

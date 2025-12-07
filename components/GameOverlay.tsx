@@ -18,15 +18,24 @@ const HealthBar: React.FC<{ hp: number; max: number; align: 'left' | 'right'; na
     <div className={`flex flex-col w-full max-w-md ${align === 'right' ? 'items-end' : 'items-start'}`}>
       <div className="flex items-center gap-2 mb-1 ui-font font-bold text-xl uppercase tracking-widest text-white drop-shadow-md">
         <span>{name}</span>
-        <span className="text-sm text-gray-300">{hp}/{max}</span>
       </div>
-      <div className="w-full h-8 bg-gray-900/80 border-2 border-gray-600 skew-x-[-15deg] relative overflow-hidden">
-        <div 
-          className={`h-full transition-all duration-300 ease-out ${isDanger ? 'bg-red-600 animate-pulse' : 'bg-green-500'}`}
-          style={{ width: `${percent}%`, marginLeft: align === 'right' ? 'auto' : 0 }}
-        />
-        {/* Shine effect */}
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-white/20"></div>
+      <div className="flex w-full items-center gap-3">
+        {align === 'right' && (
+           <span className="game-font text-white text-lg drop-shadow-md min-w-[3ch] text-right">{Math.ceil(hp)}</span>
+        )}
+        
+        <div className="flex-1 h-8 bg-gray-900/80 border-2 border-gray-600 skew-x-[-15deg] relative overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-300 ease-out ${isDanger ? 'bg-red-600 animate-pulse' : 'bg-green-500'}`}
+            style={{ width: `${percent}%`, marginLeft: align === 'right' ? 'auto' : 0 }}
+          />
+          {/* Shine effect */}
+          <div className="absolute top-0 left-0 w-full h-1/2 bg-white/20"></div>
+        </div>
+
+        {align === 'left' && (
+           <span className="game-font text-white text-lg drop-shadow-md min-w-[3ch] text-left">{Math.ceil(hp)}</span>
+        )}
       </div>
     </div>
   );
