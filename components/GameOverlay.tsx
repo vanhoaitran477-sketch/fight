@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PlayerState, GameStatus } from '../types';
 
@@ -104,6 +105,9 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({ p1, p2, status, onStar
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 bg-cyan-400 rounded-full"></span> Special: One Hand Up/Down (Hold)
+          </div>
+          <div className="flex items-center gap-2">
+             <span className="w-3 h-3 bg-green-500 rounded-full"></span> Rain: Flap Arms (Breaks Guard)
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 bg-yellow-500 rounded-full"></span> Block: Cross Arms on Chest

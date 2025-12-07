@@ -9,9 +9,8 @@ export const GAME_CONSTANTS = {
   DAMAGE_SPECIAL: 10,
   DAMAGE_SPECIAL_BLOCKED: 3,
   CHARGE_DURATION: 2500, // 2.5 seconds (Time based)
-  CHARGE_HAND_Y_DIFF: 0.2, // Min vertical distance between hands to register 'one up one down'
-  CHARGE_HAND_X_DIFF: 0.4, // Increased: Allow wider stance
-  POSE_VERTICAL_THRESHOLD: 0.02, // Decreased: Easier to trigger 'up/down' relative to shoulder
+  CHARGE_MIN_VERTICAL_DIST: 0.15, // Min vertical distance between hands (Absolute)
+  CHARGE_MAX_HORIZONTAL_DIST: 0.3, // Max horizontal distance (prevent wide T-pose triggers)
   
   // Sword Constants
   DAMAGE_SWORD: 3,
@@ -21,6 +20,13 @@ export const GAME_CONSTANTS = {
   SWORD_BLOCK_BUFFER: 0.35, // If hands are within this distance of opposite shoulder, disable sword (prevents misfire during block)
   SWORD_SWING_THRESHOLD: 0.015, // Vertical velocity to trigger swing
   SWORD_COOLDOWN: 20, // Frames between swings
+  
+  // Rain Attack Constants (Bird Flap)
+  DAMAGE_RAIN: 1, // Damage PER SWORD if blocked
+  RAIN_COOLDOWN: 40,
+  RAIN_VELOCITY_THRESHOLD: 0.04, // Must flap fast
+  RAIN_WING_SPAN: 0.15, // Distance outwards from shoulder to count as "wings"
+  PROJECTILE_SPEED_RAIN: 20,
   
   PUNCH_COOLDOWN: 15, 
   PROJECTILE_SPEED: 15,

@@ -9,6 +9,7 @@ export interface PlayerState {
   hitTimer: number;
   punchCooldown: number;
   swordCooldown: number; // Cooldown for sword swings
+  rainCooldown: number; // Cooldown for bird flap attack
   score: number;
   charge: {
     active: boolean;
@@ -26,7 +27,7 @@ export interface Projectile {
   vy: number;
   ownerId: 1 | 2;
   active: boolean;
-  type: 'normal' | 'special' | 'slash';
+  type: 'normal' | 'special' | 'slash' | 'rain';
   damage: number;
 }
 

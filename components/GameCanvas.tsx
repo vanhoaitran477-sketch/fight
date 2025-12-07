@@ -28,6 +28,7 @@ const createPlayer = (id: 1 | 2): PlayerState => ({
   hitTimer: 0,
   punchCooldown: 0,
   swordCooldown: 0,
+  rainCooldown: 0,
   score: 0,
   charge: {
     active: false,
@@ -192,6 +193,8 @@ export const GameCanvas: React.FC = () => {
         if (p2Data.punchCooldown > 0) p2Data.punchCooldown--;
         if (p1Data.swordCooldown > 0) p1Data.swordCooldown--;
         if (p2Data.swordCooldown > 0) p2Data.swordCooldown--;
+        if (p1Data.rainCooldown > 0) p1Data.rainCooldown--;
+        if (p2Data.rainCooldown > 0) p2Data.rainCooldown--;
 
         // Identify players (Left vs Right)
         let leftPlayerLandmarks: Landmark[] | null = null;
@@ -275,9 +278,9 @@ export const GameCanvas: React.FC = () => {
                  return;
              }
 
-             // Anti-Cross Check 2: Shoulder Proximity Buffer (CRITICAL FIX)
+             // Anti-Cross Check 2: Shoulder Proximity Buffer
              // If either wrist is getting close to the opposite shoulder (preparing to block),
-             // disable sword generation. This buffer is larger than the block threshold.
+             // disable sword generation.
              if (distLtoR < GAME_CONSTANTS.SWORD_BLOCK_BUFFER || distRtoL < GAME_CONSTANTS.SWORD_BLOCK_BUFFER) {
                  return;
              }
@@ -317,24 +320,58 @@ export const GameCanvas: React.FC = () => {
              return; // Skip other attacks
         }
 
-        // 3. SPECIAL ATTACK - CHARGE DETECTION
-        // Calculate status relative to shoulders for "Up" and "Down"
-        const isLeftUp = leftWrist.y < leftShoulder.y - GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
-        const isLeftDown = leftWrist.y > leftShoulder.y + GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
-        const isRightUp = rightWrist.y < rightShoulder.y - GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
-        const isRightDown = rightWrist.y > rightShoulder.y + GAME_CONSTANTS.POSE_VERTICAL_THRESHOLD;
+        // 3. RAIN ATTACK (Bird Flap)
+        // Check for specific "Wings Out" pose using directional checks
+        // Right Wrist must be to the left of Right Shoulder (Raw Video Coords: x < shoulder.x)
+        // Left Wrist must be to the right of Left Shoulder (Raw Video Coords: x > shoulder.x)
+        const isRightWingOut = rightWrist.x < (rightShoulder.x - GAME_CONSTANTS.RAIN_WING_SPAN);
+        const isLeftWingOut = leftWrist.x > (leftShoulder.x + GAME_CONSTANTS.RAIN_WING_SPAN);
         
-        // Valid if (Left Up & Right Down) OR (Left Down & Right Up)
-        const validGesture = (isLeftUp && isRightDown) || (isLeftDown && isRightUp);
-        
+        const isWingsOut = isRightWingOut && isLeftWingOut;
+
+        if (isWingsOut && playerData.rainCooldown === 0) {
+             const vLeftY = Math.abs(leftWrist.y - prevWrists.left.y);
+             const vRightY = Math.abs(rightWrist.y - prevWrists.right.y);
+
+             if (vLeftY > GAME_CONSTANTS.RAIN_VELOCITY_THRESHOLD && vRightY > GAME_CONSTANTS.RAIN_VELOCITY_THRESHOLD) {
+                 // Trigger Rain
+                 playerData.rainCooldown = GAME_CONSTANTS.RAIN_COOLDOWN;
+                 
+                 // Spawn 5 swords above the OPPONENT
+                 // Logic uses Raw Video Coords (0=Visual Right, 1=Visual Left)
+                 // P1 (ID 1) is Visual Left (x > 0.5). To hit P2 (Visual Right), aim for x < 0.5
+                 // P2 (ID 2) is Visual Right (x < 0.5). To hit P1 (Visual Left), aim for x > 0.5
+                 
+                 const startX = playerData.id === 1 ? 0.1 : 0.6;
+                 const endX = playerData.id === 1 ? 0.4 : 0.9;
+                 const step = (endX - startX) / 4;
+
+                 for(let i=0; i<5; i++) {
+                     const tx = startX + step * i + (Math.random() * 0.05 - 0.025);
+                     projectiles.push({
+                         id: Math.random().toString(36),
+                         x: tx * p.width,
+                         y: -50 - (Math.random() * 100), // Staggered start above screen
+                         vx: 0,
+                         vy: GAME_CONSTANTS.PROJECTILE_SPEED_RAIN, // Downwards
+                         ownerId: playerData.id,
+                         active: true,
+                         type: 'rain',
+                         damage: GAME_CONSTANTS.DAMAGE_RAIN
+                     });
+                 }
+                 updateReactState("SWORD RAIN!");
+             }
+        }
+
+        // 4. SPECIAL ATTACK - CHARGE DETECTION
+        const validGesture = Math.abs(leftWrist.y - rightWrist.y) > GAME_CONSTANTS.CHARGE_MIN_VERTICAL_DIST;
         const xDiff = Math.abs(leftWrist.x - rightWrist.x);
         
         // Only interrupt charge if gesture is invalid AND player is not currently being hit
-        // (Super Armor during hit prevents charge loss)
         const shouldBreakCharge = !validGesture && !playerData.isHit; 
         
-        // Must be in pose, within horizontal limits. REMOVED stability check.
-        const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_HAND_X_DIFF;
+        const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_MAX_HORIZONTAL_DIST;
 
         if (isChargeGesture || (playerData.charge.active && playerData.isHit)) {
             const now = performance.now();
@@ -384,7 +421,7 @@ export const GameCanvas: React.FC = () => {
             }
         }
 
-        // 4. PUNCH DETECTION
+        // 5. PUNCH DETECTION
         const hands = [
             { id: 'left', wrist: leftWrist, elbow: leftElbow, shoulder: leftShoulder, prev: prevWrists.left },
             { id: 'right', wrist: rightWrist, elbow: rightElbow, shoulder: rightShoulder, prev: prevWrists.right }
@@ -455,8 +492,10 @@ export const GameCanvas: React.FC = () => {
         for (let i = projectiles.length - 1; i >= 0; i--) {
             const proj = projectiles[i];
             proj.x += proj.vx;
+            proj.y += proj.vy; // Handle Y movement for Rain
             
-            if (proj.x < 0 || proj.x > p.width) {
+            // Bounds check (X or Y)
+            if (proj.x < 0 || proj.x > p.width || proj.y > p.height) {
                 projectiles.splice(i, 1);
                 continue;
             }
@@ -474,14 +513,25 @@ export const GameCanvas: React.FC = () => {
                     } else if (proj.type === 'slash') {
                         // Sword slash does 0 damage if blocked
                         updateReactState("FULL BLOCK!");
+                    } else if (proj.type === 'rain') {
+                        // Rain DOES damage if blocked (Armor Piercing / Punishment)
+                        targetData.hp -= proj.damage;
+                        targetData.isHit = true; 
+                        targetData.hitTimer = GAME_CONSTANTS.HIT_FLASH_DURATION;
+                        updateReactState("GUARD BREAK!");
                     } else {
                         targetData.hp -= GAME_CONSTANTS.DAMAGE_BLOCKED;
                         updateReactState("BLOCKED!");
                     }
                 } else {
-                    targetData.hp -= proj.damage;
-                    targetData.isHit = true;
-                    targetData.hitTimer = GAME_CONSTANTS.HIT_FLASH_DURATION;
+                    if (proj.type === 'rain') {
+                        // Rain does 0 damage if NOT blocking
+                        updateReactState("MISSED!");
+                    } else {
+                        targetData.hp -= proj.damage;
+                        targetData.isHit = true;
+                        targetData.hitTimer = GAME_CONSTANTS.HIT_FLASH_DURATION;
+                    }
                 }
 
                 if (targetData.hp <= 0 || (proj.ownerId === 1 ? p1Data.hp <= 0 : p2Data.hp <= 0)) {
@@ -508,6 +558,15 @@ export const GameCanvas: React.FC = () => {
                 p.fill(255, 50, 50, 200);
                 p.arc(0, 0, 80, 160, -p.PI/2, p.PI/2, p.CHORD);
                 p.pop();
+            } else if (proj.type === 'rain') {
+                // Draw green vertical sword/beam
+                p.fill(0, 255, 0, 200);
+                p.rect(proj.x - 5, proj.y - 40, 10, 80);
+                p.fill(200, 255, 200);
+                p.rect(proj.x - 2, proj.y - 40, 4, 80);
+                // Glow
+                p.fill(0, 255, 0, 100);
+                p.ellipse(proj.x, proj.y, 20, 100);
             } else {
                 p.fill(255, 255, 255, 100);
                 p.circle(proj.x, proj.y, 60);
