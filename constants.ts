@@ -9,8 +9,8 @@ export const GAME_CONSTANTS = {
   DAMAGE_SPECIAL: 10,
   DAMAGE_SPECIAL_BLOCKED: 3,
   CHARGE_DURATION: 2500, // 2.5 seconds (Time based)
-  CHARGE_MIN_VERTICAL_DIST: 0.15, // Min vertical distance between hands (Absolute)
-  CHARGE_MAX_HORIZONTAL_DIST: 0.3, // Max horizontal distance (prevent wide T-pose triggers)
+  CHARGE_MIN_VERTICAL_DIST: 0.1, // Relaxed: Easier to trigger
+  CHARGE_MAX_HORIZONTAL_DIST: 0.25, // Hands must be relatively vertically aligned
   
   // Sword Constants
   DAMAGE_SWORD: 3,

@@ -1,11 +1,10 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import p5 from 'p5';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
 import { GameStatus, PlayerState, Projectile, Landmark } from '../types';
 import { GAME_CONSTANTS } from '../constants';
 import { GameOverlay } from './GameOverlay';
-import { calculateAngle, dist, checkCollision } from '../utils/geometry';
+import { calculateAngle, dist, checkCollision, getConvexHull, Point } from '../utils/geometry';
 
 // We declare these outside the component to avoid stale closures in the p5 loop
 // and to keep the loop performant without excessive React state updates.
@@ -251,8 +250,15 @@ export const GameCanvas: React.FC = () => {
         const distLtoR = dist(leftWrist, rightShoulder);
         const distRtoL = dist(rightWrist, leftShoulder);
         
+        // Anti-False Positive: Block MUST involve crossed arms.
+        // In the mirrored view (and standard MediaPipe pose), 
+        // the Right Wrist (normally low X) crossing to the Left side (high X) 
+        // results in Right Wrist X > Left Wrist X.
+        const isArmsCrossed = rightWrist.x > leftWrist.x;
+
         const isNowBlocking = distLtoR < GAME_CONSTANTS.BLOCK_SHOULDER_DIST && 
-                              distRtoL < GAME_CONSTANTS.BLOCK_SHOULDER_DIST;
+                              distRtoL < GAME_CONSTANTS.BLOCK_SHOULDER_DIST &&
+                              isArmsCrossed;
 
         if (isNowBlocking) {
              playerData.isBlocking = true;
@@ -321,9 +327,6 @@ export const GameCanvas: React.FC = () => {
         }
 
         // 3. RAIN ATTACK (Bird Flap)
-        // Check for specific "Wings Out" pose using directional checks
-        // Right Wrist must be to the left of Right Shoulder (Raw Video Coords: x < shoulder.x)
-        // Left Wrist must be to the right of Left Shoulder (Raw Video Coords: x > shoulder.x)
         const isRightWingOut = rightWrist.x < (rightShoulder.x - GAME_CONSTANTS.RAIN_WING_SPAN);
         const isLeftWingOut = leftWrist.x > (leftShoulder.x + GAME_CONSTANTS.RAIN_WING_SPAN);
         
@@ -337,11 +340,6 @@ export const GameCanvas: React.FC = () => {
                  // Trigger Rain
                  playerData.rainCooldown = GAME_CONSTANTS.RAIN_COOLDOWN;
                  
-                 // Spawn 5 swords above the OPPONENT
-                 // Logic uses Raw Video Coords (0=Visual Right, 1=Visual Left)
-                 // P1 (ID 1) is Visual Left (x > 0.5). To hit P2 (Visual Right), aim for x < 0.5
-                 // P2 (ID 2) is Visual Right (x < 0.5). To hit P1 (Visual Left), aim for x > 0.5
-                 
                  const startX = playerData.id === 1 ? 0.1 : 0.6;
                  const endX = playerData.id === 1 ? 0.4 : 0.9;
                  const step = (endX - startX) / 4;
@@ -351,9 +349,9 @@ export const GameCanvas: React.FC = () => {
                      projectiles.push({
                          id: Math.random().toString(36),
                          x: tx * p.width,
-                         y: -50 - (Math.random() * 100), // Staggered start above screen
+                         y: -50 - (Math.random() * 100),
                          vx: 0,
-                         vy: GAME_CONSTANTS.PROJECTILE_SPEED_RAIN, // Downwards
+                         vy: GAME_CONSTANTS.PROJECTILE_SPEED_RAIN,
                          ownerId: playerData.id,
                          active: true,
                          type: 'rain',
@@ -368,11 +366,20 @@ export const GameCanvas: React.FC = () => {
         const validGesture = Math.abs(leftWrist.y - rightWrist.y) > GAME_CONSTANTS.CHARGE_MIN_VERTICAL_DIST;
         const xDiff = Math.abs(leftWrist.x - rightWrist.x);
         
-        // Only interrupt charge if gesture is invalid AND player is not currently being hit
-        const shouldBreakCharge = !validGesture && !playerData.isHit; 
-        
-        const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_MAX_HORIZONTAL_DIST;
+        // NEW REQUIREMENT: At least one hand must be ABOVE the shoulder.
+        // In screen coords, Y=0 is top, Y=1 is bottom. Smaller Y = Higher up.
+        const isOneHandAbove = leftWrist.y < leftShoulder.y || rightWrist.y < rightShoulder.y;
 
+        // Relaxed detection: We don't check for "Uncrossed" or "NearBlock" strictly here.
+        // The Block detection at the top handles the "Crossed Arms" case (which returns early).
+        // If we are here, we are NOT blocking.
+        // Just ensure horizontal distance is reasonable (holding a ball) and vertical distance is sufficient,
+        // AND one hand is raised above shoulder height.
+        
+        const isChargeGesture = validGesture && xDiff < GAME_CONSTANTS.CHARGE_MAX_HORIZONTAL_DIST && isOneHandAbove;
+
+        // If we were charging and got hit, allow charge to continue (Super Armor-ish for visual continuity)
+        // OR if current gesture is valid.
         if (isChargeGesture || (playerData.charge.active && playerData.isHit)) {
             const now = performance.now();
             
@@ -394,7 +401,8 @@ export const GameCanvas: React.FC = () => {
             prevWrists.left.x = leftWrist.x; prevWrists.left.y = leftWrist.y;
             prevWrists.right.x = rightWrist.x; prevWrists.right.y = rightWrist.y;
             return;
-        } else if (shouldBreakCharge) {
+        } else {
+            // Gesture broken (and not being hit)
             if (playerData.charge.active) {
                 if (playerData.charge.complete) {
                     // FIRE SPECIAL!
@@ -589,11 +597,18 @@ export const GameCanvas: React.FC = () => {
             const sy = minY * p.height;
             const sh = (maxY - minY) * p.height;
 
-            // Hit Effect
+            // Hit Effect - Red Blob/Contour
             if (data.isHit) {
                 p.fill(255, 0, 0, 150);
                 p.noStroke();
-                p.rect(sx, sy, sw, sh);
+                
+                // Map landmarks to screen points
+                const points = landmarks.map(lm => ({ x: lm.x * p.width, y: lm.y * p.height }));
+                const hull = getConvexHull(points);
+
+                p.beginShape();
+                hull.forEach(pt => p.vertex(pt.x, pt.y));
+                p.endShape(p.CLOSE);
             }
 
             // Shield Effect

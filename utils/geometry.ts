@@ -1,6 +1,6 @@
 import { Landmark } from '../types';
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -16,6 +16,39 @@ export const calculateAngle = (a: Point, b: Point, c: Point): number => {
 
 export const dist = (a: Point, b: Point): number => {
   return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+};
+
+// Monotone Chain Convex Hull Algorithm
+export const getConvexHull = (points: Point[]): Point[] => {
+  if (points.length < 3) return points;
+
+  // Sort by X then Y
+  const sorted = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+
+  const crossProduct = (o: Point, a: Point, b: Point) => {
+    return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  };
+
+  const lower: Point[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: Point[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
 };
 
 // Check if a point (projectile) is inside a bounding box defined by landmarks
